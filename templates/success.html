@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>F33dback</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="static/script.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet"  type="text/css" href="{{url_for('static', filename='style.css')}}">
+</head>
+<body class="font-sans bg-gray-50 text-gray-800">
+    <!-- Навигация -->
+    <header class="data-gradient text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <!-- Логотип -->
+                <div class="flex items-center space-x-3 mb-4 md:mb-0">
+                    <div class="bg-white p-2 rounded-lg">
+                        <i class="fa-regular fa-clipboard text-2xl text-blue-600"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold">F33dback</h1>
+                        <p class="text-xs text-blue-200">Удобная система обратной связи</p>
+                    </div>
+                </div>
+                
+                <!-- Навигационные ссылки -->
+                <div class="flex flex-wrap justify-center gap-4 md:gap-8">
+                    <a href="/" class="px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"><i class="fas fa-chevron-right text-xs mr-2"></i>Главная</a>
+                                <a href="/login" class="px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"><i class="fas fa-chevron-right text-xs mr-2"></i>Войти в систему</a>
+                                <a href="/register" class="px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"><i class="fas fa-chevron-right text-xs mr-2"></i>Зарегистрироваться</a>
+                </div>
+            </div>
+        </div>
+    </header>
+		<body>
+    <center><div class="max-w-screen-xl  items-center justify-between mx-auto p-4 grid grid-cols-1 gap-4">
+        <h1 class="mb-4 text-4xl font-extrabold leading-none tracking-tight text-gray-900 md:text-5xl lg:text-6xl">Ваш отзыв отправлен!</h1>
+        <p class="mb-6 text-lg font-normal text-gray-500 lg:text-xl sm:px-16 xl:px-48">Зарегестрируйтесь или войдете в аккаунт для просмотра статуса заявок!</p>
+        <p class="mb-6 text-lg font-normal text-gray-500 lg:text-xl sm:px-16 xl:px-48">(текущая заявка отправлена анонимно и не может быть просмотрена вами)</p>
+        <a href="/" class="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-900">
+        Вернуться на главную
+        <svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/></svg></a>
+        <div class="grid grid-cols-1 md:grid-cols-2 mb-10"><div>
+        <a href="/login" class="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-900">
+        Войти в систему
+        <svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/></svg></a>
+        </div><div>
+        <a href="/register" class="inline-flex items-center justify-center px-5 py-3 text-base font-medium text-center text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-900">
+        Зарегистрироваться
+        <svg class="w-3.5 h-3.5 ms-2 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 10">
+        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M1 5h12m0 0L9 1m4 4L9 9"/></svg></a>
+        </div></div>
+    </div>
+</body></center>
+    <!-- Футер -->
+    <footer class="bg-gray-900 text-white pt-12 pb-8">
+        <div class="container mx-auto px-3">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+                <!-- Колонка 1: О компании -->
+                <div>
+                    <div class="flex items-center space-x-3 mb-6">
+                        <div class="bg-white p-2 rounded-lg">
+                            <i class="fas fa-chart-line text-2xl text-blue-600"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold">F33dback</h2>
+                            <p class="text-sm text-gray-400">Удобная система обратной связи</p>
+                        </div>
+                    </div>
+                    <p class="text-gray-400 mb-6">
+                        Портал для обеспечения удобства отправки и проверки отзывов
+                    </p>
+                </div>
+                
+                <!-- Колонка 3: Контакты -->
+                <div>
+                    <h3 class="text-lg font-bold mb-6 border-l-4 border-blue-500 pl-3">Контакты</h3>
+                    <div class="space-y-4">
+                        <div class="flex items-start space-x-3">
+                            <i class="fas fa-map-marker-alt mt-1 text-blue-400"></i>
+                            <span class="text-gray-400">Севастополь, ул. Репина 3</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-phone text-blue-400"></i>
+                            <span class="text-gray-400">+7-(978)-72-49-688</span>
+                        </div>
+                        <div class="flex items-center space-x-3">
+                            <i class="fas fa-envelope text-blue-400"></i>
+                            <span class="text-gray-400">mixikan879@gmail.com</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Колонка 4: Быстрые действия -->
+                <div>
+                    <h3 class="text-lg font-bold mb-6 border-l-4 border-blue-500 pl-3">Быстрые действия</h3>
+                    <div class="space-y-3">
+                        <a href="/feedback" class="block w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-semibold text-center transition-colors">
+                            Оставить отзыв
+                        </a>
+                        {% if session.get('user_id') %}
+                            <ul class="space-y-3">
+                                <li><a href="/profile" class="text-gray-400 hover:text-white transition-colors"><i class="fas fa-chevron-right text-xs mr-2"></i>Личный кабинет</a></li>
+                                <li><a href="/logout" class="text-gray-400 hover:text-white transition-colors"><i class="fas fa-chevron-right text-xs mr-2"></i>Выйти из системы</a></li>
+                            </ul>
+                        {% else %}
+                            <ul class="space-y-3">
+                                <li><a href="/login" class="text-gray-400 hover:text-white transition-colors"><i class="fas fa-chevron-right text-xs mr-2"></i>Войти в систему</a></li>
+                                <li><a href="/register" class="text-gray-400 hover:text-white transition-colors"><i class="fas fa-chevron-right text-xs mr-2"></i>Зарегистрироваться</a></li>
+                            </ul>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Копирайт -->
+            <div class="pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
+                <p>&copy; 2026 F33dback.</p>
+            </div>
+        </div>
+    </footer>
+    <script src="static/anim.js"></script>
+</body>
+</html>

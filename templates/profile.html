@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet"  type="text/css" href="{{url_for('static', filename='style.css')}}">
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 <body class="bg-gray-50 font-sans">
 
@@ -22,6 +23,7 @@
                     <i class="fas fa-arrow-left mr-1"></i>
                     Вернуться на главную
                 </a>
+                <!-- После ссылки "Вернуться на главную" -->
                 <a href="{{ url_for('logout') }}" class="text-white hover:text-blue-200 transition">
                     <i class="fas fa-sign-out-alt"></i> Выйти
                 </a>
@@ -57,13 +59,98 @@
                         Всего заявок: {{ total_count }}
                     </p>
             <div class="mt-4 pt-4 border-t border-gray-100">
-                <a href="{{ url_for('feedback_form') }}" 
-                   class="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-                    <i class="fas fa-plus mr-2"></i>
-                    Новая заявка
-                </a>
+    <div class="flex flex-wrap gap-3">
+        <a href="{{ url_for('feedback_form') }}" 
+           class="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+            <i class="fas fa-plus mr-2"></i>
+            Новая заявка
+        </a>
+        
+        {% if session.get('role') == 1 %}
+        <button onclick="toggleExportPanel()" 
+                class="inline-flex items-center bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+            <i class="fas fa-file-export mr-2"></i>
+            Экспорт в CSV
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 📥 Панель экспорта (скрыта по умолчанию) -->
+{% if session.get('role') == 1 %}
+<div id="export-panel" class="hidden mt-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
+    <h3 class="text-lg font-semibold text-gray-800 mb-3">
+        <i class="fas fa-file-csv text-green-600 mr-2"></i>
+        Экспорт отзывов в CSV
+    </h3>
+    
+    <form action="{{ url_for('export_feedbacks_csv') }}" method="GET" class="space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            
+            <!-- Дата начала -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <i class="fas fa-calendar-alt mr-1"></i>Дата начала
+                </label>
+                <input type="date" name="from_date" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+            </div>
+            
+            <!-- Дата окончания -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <i class="fas fa-calendar-alt mr-1"></i>Дата окончания
+                </label>
+                <input type="date" name="to_date" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+            </div>
+            
+            <!-- Статус -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <i class="fas fa-tag mr-1"></i>Статус
+                </label>
+                <select name="status" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+                    <option value="">Все статусы</option>
+                    <option value="new">Новая</option>
+                    <option value="in_progress">В работе</option>
+                    <option value="completed">Завершена</option>
+                </select>
+            </div>
+            
+            <!-- Категория -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    <i class="fas fa-folder mr-1"></i>Категория
+                </label>
+                <select name="category" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+                    <option value="">Все категории</option>
+                    <option value="Положительный">Положительный</option>
+                    <option value="Проблема">Проблема</option>
+                    <option value="Предложение">Предложение</option>
+                </select>
+            </div>
+            
+            <!-- Пустой блок для кнопки -->
+            <div class="flex items-end">
+                <button type="submit" 
+                        class="w-full bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition font-medium">
+                    <i class="fas fa-download mr-2"></i>
+                    Скачать CSV
+                </button>
             </div>
         </div>
+        
+        <!-- Подсказка -->
+        <p class="text-xs text-gray-500 mt-2">
+            <i class="fas fa-info-circle mr-1"></i>
+            Если не указать даты — будут экспортированы все отзывы
+        </p>
+    </form>
+</div>
+{% endif %}
 
         <!-- Секция заявок -->
         <div class="mb-4 flex justify-between items-center">
@@ -75,6 +162,70 @@
                     Мои заявки
                 {% endif %}
             </h2>
+            
+    
+            <!-- Кнопка переключения режима -->
+    {% if session.get('role') == 1 %}
+    
+    <!--  Панель фильтров (скрыта по умолчанию) -->
+    <div id="api-filters" class="hidden bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            
+            <!-- Фильтр по статусу -->
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                    <i class="fas fa-tag mr-1"></i>Статус
+                </label>
+                <select id="filter-status" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <option value="">Все статусы</option>
+                    <option value="new">Новая</option>
+                    <option value="in_progress">В работе</option>
+                    <option value="completed">Завершена</option>
+                </select>
+            </div>
+            
+            <!-- Фильтр по категории -->
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                    <i class="fas fa-folder mr-1"></i>Категория
+                </label>
+                <select id="filter-category" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <option value="">Все категории</option>
+                    <option value="Положительный">Положительный</option>
+                    <option value="Проблема">Проблема</option>
+                    <option value="Предложение">Предложение</option>
+                </select>
+            </div>
+            
+            <!-- Сортировка по дате -->
+            <div>
+                <label class="block text-xs font-medium text-gray-600 mb-1">
+                    <i class="fas fa-calendar mr-1"></i>Сортировка по дате
+                </label>
+                <select id="sort-date" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                    <option value="desc">Сначала новые</option>
+                    <option value="asc">Сначала старые</option>
+                </select>
+            </div>
+            
+            <!-- Кнопки управления -->
+            <div class="flex items-end space-x-2">
+                <button id="apply-filters" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium">
+                    <i class="fas fa-filter mr-1"></i> Применить
+                </button>
+                <button id="reset-filters" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition text-sm">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Активные фильтры (индикатор) -->
+        <div id="active-filters" class="hidden flex flex-wrap gap-2 pt-2 border-t border-gray-200">
+            <!-- Сюда будут добавляться теги активных фильтров -->
+        </div>
+    </div>
+                        {% endif %}
+</div>
             {% if requests %}
                 <span class="text-sm text-gray-500">
                     {{ (current_page - 1) * per_page + 1 }}–{{ [(current_page * per_page), total_count]|min }} из {{ total_count }}
@@ -98,11 +249,6 @@
                             <h3 class="font-semibold text-gray-800">
                                 {{ req.category or 'Без темы' }}
                             </h3>
-                            {% if req.company %}
-                                <p class="text-sm text-gray-500">
-                                    <i class="fas fa-building mr-1"></i>{{ req.company }}
-                                </p>
-                            {% endif %}
                         </div>
                         
                         <!-- Статус -->
@@ -125,21 +271,54 @@
                         <span>
                             <i class="fas fa-clock mr-1"></i>
                             {{ req.created_at.strftime('%d.%m.%Y %H:%M') }}
-                            <i class="fa-solid fa-bars"></i>
+                            {% if session.get('role') == 1 %}<i class="fa-solid fa-bars"></i>
                             {{ req.user_name}}
-                        </span>
-                        
+                            {{ req.id}}
+                            {%endif%}
+                         </span>
+    
                         {% if session.get('role') == 1 %}
-                        <form method="POST" action="{{ url_for('update_feedback_status') }}" class="flex items-center gap-2">
+                        <!-- 🔄 Форма обновления статуса (с JavaScript) -->
+                        <form data-feedback-form data-feedback-id="{{ req.id }}" class="flex items-center gap-2">
+                            <!-- CSRF токен (если нужен для API) -->
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                            <input type="hidden" name="feedback_id" value="{{ req.id }}">
-                            
-                            <select name="status" class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none" onchange="this.form.submit()">
+        
+                            <select 
+                            name="status" 
+                            data-status-select
+                            class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                            {% if req.status == 'completed' %}disabled{% endif %}
+                            >
                                 <option value="new" {% if req.status == 'new' %}selected{% endif %}>Новая</option>
                                 <option value="in_progress" {% if req.status == 'in_progress' %}selected{% endif %}>В работе</option>
                                 <option value="completed" {% if req.status == 'completed' %}selected{% endif %}>Завершена</option>
-                                
                             </select>
+        
+                            <!-- Индикатор загрузки -->
+                            <span data-loading class="hidden">
+                                <i class="fas fa-spinner fa-spin text-blue-500"></i>
+                            </span>
+                        </form>
+                        {% else %}
+                        <form data-feedback-form data-feedback-id="{{ req.id }}" class="flex items-center gap-2">
+                            <!-- CSRF токен (если нужен для API) -->
+                            <input class="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        
+                            <select 
+                            name="status" 
+                            data-status-select
+                            class="hidden text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                            {% if req.status == 'completed' %}disabled{% endif %}
+                            >
+                                <option value="new" {% if req.status == 'new' %}selected{% endif %}>Новая</option>
+                                <option value="in_progress" {% if req.status == 'in_progress' %}selected{% endif %}>В работе</option>
+                                <option value="completed" {% if req.status == 'completed' %}selected{% endif %}>Завершена</option>
+                            </select>
+        
+                            <!-- Индикатор загрузки -->
+                            <span data-loading class="hidden">
+                                <i class="fas fa-spinner fa-spin text-blue-500"></i>
+                            </span>
                         </form>
                         {% endif %}
                     </div>
@@ -242,6 +421,220 @@
             © 2026 F33dback · Личный кабинет
         </div>
     </footer>
+<script>
+// 📊 КОНФИГУРАЦИЯ СТАТУСОВ (глобальная переменная)
+const statusConfig = {
+    'new': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Новая', border: 'border-yellow-500' },
+    'in_progress': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'В работе', border: 'border-blue-500' },
+    'completed': { bg: 'bg-green-100', text: 'text-green-800', label: 'Завершена', border: 'border-green-500' },
+    'cancelled': { bg: 'bg-red-100', text: 'text-red-800', label: 'Отменена', border: 'border-red-500' }
+};
 
+// 🔌 Подключение к WebSocket
+const socket = io({
+    transports: ['websocket', 'polling'],
+    reconnection: true,
+    reconnectionAttempts: 5
+});
+
+socket.on('connect', () => {
+    console.log('✅ WebSocket подключён:', socket.id);
+    socket.emit('join_room', { room: 'feedbacks' });
+});
+
+socket.on('disconnect', () => {
+    console.log('❌ WebSocket отключён');
+});
+
+// 📡 Слушаем обновление статуса
+socket.on('status_updated', (data) => {
+    console.log('🔄 Получено обновление:', data);
+    
+    const feedbackId = data.feedback_id;
+    const newStatus = data.new_status;
+    
+    // 🔍 Ищем карточку на текущей странице
+    const form = document.querySelector(`[data-feedback-form][data-feedback-id="${feedbackId}"]`);
+    
+    if (form) {
+        // ✅ Карточка найдена - обновляем её
+        updateFeedbackCard(form, data);
+    } else {
+        // ❌ Карточка не найдена (другая страница или не в списке)
+        console.log(`⚠️ Заявка #${feedbackId} не найдена на текущей странице`);
+        
+        // Показываем уведомление
+        showNotification(
+            `Заявка #${feedbackId} обновлена: ${getStatusLabel(newStatus)}. Обновите страницу для просмотра.`,
+            'info'
+        );
+        
+        // Опционально: добавляем кнопку для быстрого перехода
+        setTimeout(() => {
+            const toast = document.querySelector('.toast-notification');
+            if (toast) {
+                const refreshBtn = document.createElement('button');
+                refreshBtn.className = 'ml-3 px-2 py-1 bg-white bg-opacity-20 rounded text-xs hover:bg-opacity-30 transition';
+                refreshBtn.textContent = 'Обновить';
+                refreshBtn.onclick = () => window.location.reload();
+                toast.querySelector('button[onclick*="remove"]')?.before(refreshBtn);
+            }
+        }, 100);
+    }
+});
+
+// 🔄 Функция обновления карточки
+function updateFeedbackCard(form, data) {
+    const feedbackId = data.feedback_id;
+    const newStatus = data.new_status;
+    
+    const card = form.closest('.request-card');
+    if (!card) {
+        console.log('⚠️ Карточка не найдена');
+        return;
+    }
+    
+    const config = statusConfig[newStatus];
+    if (!config) {
+        console.log('⚠️ Неизвестный статус:', newStatus);
+        return;
+    }
+    
+    // 1️⃣ Обновляем бейдж
+    const badge = card.querySelector('[class*="bg-"][class*="100"]');
+    if (badge) {
+        badge.classList.remove(
+            'bg-yellow-100', 'text-yellow-800',
+            'bg-blue-100', 'text-blue-800',
+            'bg-green-100', 'text-green-800',
+            'bg-red-100', 'text-red-800'
+        );
+        badge.classList.add(config.bg, config.text);
+        badge.textContent = config.label;
+    }
+    
+    // 2️⃣ Обновляем границу
+    card.classList.remove('border-yellow-500', 'border-blue-500', 'border-green-500', 'border-red-500');
+    card.classList.add(config.border);
+    
+    // 3️⃣ Обновляем select
+    const select = form.querySelector('select[name="status"]');
+    if (select) {
+        select.value = newStatus;
+        select.disabled = (newStatus === 'completed');
+    }
+    
+    // 4️⃣ Уведомление
+    showNotification(
+        `Заявка #${feedbackId}: статус изменён на "${config.label}"`,
+        'info'
+    );
+    
+    // 5️⃣ Визуальный эффект
+    card.classList.add('ring-2', 'ring-blue-400', 'transition-all', 'duration-500');
+    setTimeout(() => card.classList.remove('ring-2', 'ring-blue-400'), 1500);
+}
+
+// 📊 Вспомогательная функция для получения названия статуса
+function getStatusLabel(status) {
+    const labels = {
+        'new': 'Новая',
+        'in_progress': 'В работе',
+        'completed': 'Завершена',
+
+    };
+    return labels[status] || status;
+}
+
+// 🔄 Обработчик изменения статуса (отправка на сервер)
+document.querySelectorAll('[data-feedback-form]').forEach(form => {
+    const select = form.querySelector('select[name="status"]');
+    
+    select?.addEventListener('change', async function(e) {
+        const feedbackId = form.dataset.feedbackId;
+        const newStatus = this.value;
+        const loading = form.querySelector('[data-loading]');
+        const originalValue = this.dataset.original || this.value;
+        
+        this.dataset.original = originalValue;
+        
+        loading?.classList.remove('hidden');
+        this.disabled = true;
+        
+        try {
+            const response = await fetch(`/api/feedbacks/${feedbackId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: newStatus })
+            });
+            
+            const result = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(result.message || 'Ошибка обновления');
+            }
+            
+            showNotification('Статус обновлён ✓', 'success');
+            
+        } catch (error) {
+            console.error('❌ Ошибка:', error);
+            this.value = originalValue;
+            showNotification(error.message || 'Не удалось обновить статус', 'error');
+            
+        } finally {
+            loading?.classList.add('hidden');
+            if (this.value !== 'completed') {
+                this.disabled = false;
+            }
+        }
+    });
+});
+
+// 📢 Функция уведомлений
+function showNotification(message, type = 'info') {
+    document.querySelectorAll('.toast-notification')?.forEach(el => el.remove());
+    
+    const colors = {
+        success: 'bg-green-500',
+        error: 'bg-red-500',
+        info: 'bg-blue-500'
+    };
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification fixed bottom-4 right-4 ${colors[type]} text-white px-4 py-3 rounded-lg shadow-lg z-50 animate-fade-in`;
+    toast.innerHTML = `
+        <div class="flex items-center">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'} mr-2"></i>
+            <span>${message}</span>
+            <button onclick="this.parentElement.parentElement.remove()" class="ml-3 hover:opacity-75">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+<script>
+    // 📥 Панель экспорта
+function toggleExportPanel() {
+    const panel = document.getElementById('export-panel');
+    if (panel) {
+        panel.classList.toggle('hidden');
+    }
+}
+
+// Автоматическая установка даты окончания на сегодня
+document.addEventListener('DOMContentLoaded', function() {
+    const toDateInput = document.querySelector('input[name="to_date"]');
+    if (toDateInput && !toDateInput.value) {
+        const today = new Date().toISOString().split('T')[0];
+        toDateInput.value = today;
+    }
+});
+</script>
 </body>
 </html>

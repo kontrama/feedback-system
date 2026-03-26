@@ -1,5 +1,8 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for, flash
+from flask import Flask, render_template, request, jsonify, session, Response, redirect, url_for, flash
+from flask_socketio import SocketIO, emit, join_room, disconnect
 import os
+from io import StringIO
+import csv
 import re
 import mysql.connector
 from mysql.connector import Error
@@ -10,6 +13,15 @@ from datetime import datetime, timedelta
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)  # Для защиты сессий
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)  # Время жизни сессии
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*",  # В продакшене укажите ваш домен
+    async_mode='eventlet',  # или 'gevent'
+    logger=True,  # Включить логирование для отладки
+    engineio_logger=True
+)
+app.config['SESSION_COOKIE_HTTPONLY'] = False  # Разрешить доступ к кукам из JS
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 def login_required(f):
     @wraps(f)
@@ -216,7 +228,7 @@ def profile():
     user_id = session['user_id']
     role = session['role']
     
-    # ⚙️ Настройки пагинации
+    #  Настройки пагинации
     page = request.args.get('page', 1, type=int)
     per_page = 10  # Записей на страницу
     
@@ -231,7 +243,7 @@ def profile():
         )
         user_data = cursor.fetchone()
         
-        # 🔢 Подсчёт общего количества заявок для расчёта страниц
+        #  Подсчёт общего количества заявок для расчёта страниц
         if role == 0:
             cursor.execute("SELECT COUNT(*) as count FROM feedbacks WHERE author_id = %s", (user_id,))
         elif role == 1:
@@ -240,7 +252,7 @@ def profile():
         total_count = cursor.fetchone()['count']
         total_pages = (total_count + per_page - 1) // per_page  # Округление вверх
         
-        # 📄 Получение заявок с ограничением (LIMIT и OFFSET)
+        #  Получение заявок с ограничением (LIMIT и OFFSET)
         offset = (page - 1) * per_page
         
         if role == 0:
@@ -271,51 +283,74 @@ def profile():
         }
         
         return render_template('profile.html',
-                             username=session.get('username'),
-                             requests=user_feedbacks,           # список заявок
-    status_labels=status_labels,       # словари статусов
-    
-    # 📊 Пагинация:
-    current_page=page,                 # текущая страница
-    total_pages=total_pages,           # всего страниц
-    total_count=total_count,           # всего записей
-    per_page=per_page,                 # записей на страницу
-    has_prev=page > 1,                 # есть ли предыдущая
-    has_next=page < total_pages,       )
+                            username=session.get('username'),
+                            requests=user_feedbacks,           # список заявок
+                            status_labels=status_labels,       # словари статусов
+                            #  Пагинация:
+                            current_page=page,                 # текущая страница
+                            total_pages=total_pages,           # всего страниц
+                            total_count=total_count,           # всего записей
+                            per_page=per_page,                 # записей на страницу
+                            has_prev=page > 1,                 # есть ли предыдущая
+                            has_next=page < total_pages)
                              
     except Error as e:
         print(f'Ошибка загрузки профиля: {e}')
         flash(f'Ошибка загрузки профиля: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
-@app.route('/update-feedback-status', methods=['POST'])
-@login_required
-def update_feedback_status():
-    """Обновление статуса заявки (только для админов)"""
+@app.route('/api/feedbacks/<int:feedback_id>', methods=['PATCH'], endpoint='update_feedback_status_api')
+@login_required  # проверка сессии (если используете session-based auth)
+def update_feedback_status_api(feedback_id):
     
-    # Проверка прав администратора
+    #  Проверка прав администратора
     if session.get('role') != 1:
-        flash('Доступ запрещён', 'danger')
-        return redirect(url_for('profile'))
+        return jsonify({
+            'success': False,
+            'error': 'forbidden',
+            'message': 'Доступ запрещён. Требуются права администратора.'
+        }), 403
     
-    feedback_id = request.form.get('feedback_id', type=int)
-    new_status = request.form.get('status')
+    #  Получение данных из JSON-тела запроса
+    data = request.get_json()
     
-
-    if not feedback_id:
-        flash('Ошибка: не указан ID заявки', 'danger')
-        return redirect(url_for('profile'))
+    if not data:
+        return jsonify({
+            'success': False,
+            'error': 'invalid_request',
+            'message': 'Тело запроса должно быть в формате JSON'
+        }), 400
     
+    new_status = data.get('status')
+    
+    #  Валидация статуса
     valid_statuses = ['new', 'in_progress', 'completed']
-    if new_status not in valid_statuses:
-        flash('Ошибка: неверный статус', 'danger')
-        return redirect(url_for('profile'))
+    if not new_status or new_status not in valid_statuses:
+        return jsonify({
+            'success': False,
+            'error': 'invalid_status',
+            'message': f'Статус должен быть одним из: {", ".join(valid_statuses)}',
+            'allowed_values': valid_statuses
+        }), 400
     
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Обновляем статус в БД
+        # Сначала проверяем, существует ли заявка
+        cursor.execute("SELECT id, status FROM feedbacks WHERE id = %s", (feedback_id,))
+        existing_feedback = cursor.fetchone()
+        
+        if not existing_feedback:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                'success': False,
+                'error': 'not_found',
+                'message': f'Заявка с ID {feedback_id} не найдена'
+            }), 404
+        
+        # Обновляем статус
         cursor.execute("""
             UPDATE feedbacks 
             SET status = %s, updated_at = CURRENT_TIMESTAMP 
@@ -326,25 +361,65 @@ def update_feedback_status():
         affected = cursor.rowcount
         cursor.close()
         conn.close()
-        
+         # Отправить всем подключённым клиентам
         if affected > 0:
-            status_names = {
-                'new': 'Новая',
-                'in_progress': 'В работе', 
-                'completed': 'Завершена'
-            }
-            flash(f'Статус заявки #{feedback_id} изменён на {status_names[new_status]}', 'success')
-        else:
-            flash('Заявка не найдена', 'warning')
+        # ОТПРАВКА В КОМНАТУ
+            socketio.emit('status_updated', {
+                'feedback_id': feedback_id,
+                'new_status': new_status,
+                'updated_at': datetime.now().isoformat(),
+                'updated_by': session.get('username')
+            }, room='feedbacks') 
+            print(f'Отправлено в комнату "feedbacks": заявка #{feedback_id} → {new_status}')
+            return jsonify({'success': True, 'data': {'feedback_id': feedback_id, 'new_status': new_status}}), 200
+        return jsonify({
+            'success': True,
+            'message': 'Статус обновлён',
+            'data': {'feedback_id': feedback_id, 'new_status': new_status}
+        }), 200
             
     except Error as e:
-        print(f"Ошибка обновления статуса: {e}")
-        flash(f'Ошибка базы данных: {str(e)}', 'danger')
+        print(f"Ошибка БД при обновлении статуса: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'database_error',
+            'message': 'Ошибка при работе с базой данных'
+            # Не возвращайте детали ошибки в продакшене!
+        }), 500
+        
     except Exception as e:
-        print(f"Неожиданная ошибка: {e}")
-        flash('Произошла ошибка сервера', 'danger')
+        print(f"Неожиданная ошибка: {type(e).__name__}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'internal_error',
+            'message': 'Внутренняя ошибка сервера'
+        }), 500
+
+#  Отключение клиента
+@socketio.on('disconnect')
+def handle_disconnect():
+    print(f'Клиент отключился: {request.sid}')
+
+#  Присоединение к комнате (опционально, для фильтрации)
+@socketio.on('join_room')
+def handle_join_room(data):
+    room = data.get('room')
+    if room:
+        join_room(room)
+        print(f'✅ Клиент {request.sid} присоединился к комнате {room}')
+        # Отправляем подтверждение клиенту
+        emit('room_joined', {'room': room}, to=request.sid)
+
+@socketio.on('connect')
+def handle_connect():
+    # Проверка сессии
+    if 'user_id' not in session:
+        print('Отклонено: нет сессии')
+        disconnect()
+        return False
     
-    return redirect(url_for('profile'))
+    print(f'Подключён пользователь: {session["username"]} ({session["user_id"]})')
+    return True
 
 @app.route('/', methods=['GET'])
 def index():
@@ -352,8 +427,12 @@ def index():
                          is_authenticated='user_id' in session,
                          username=session.get('username'))
 
-@app.route('/feedback', methods=['GET', 'POST'])
+@app.route('/feedback')
 def feedback_form():
+    return render_template('feedback.html', username=session.get('username'))
+
+@app.route('/api/feedbacks', methods=['POST'])
+def feedback_send():
     if request.method == 'POST':
         # ОТЛАДКА: выводим все полученные данные
         print("POST-данные:", request.form.to_dict())
@@ -416,8 +495,138 @@ def feedback_form():
             print(f"НЕОЖИДАННАЯ ОШИБКА: {type(e).__name__}: {e}")
             flash(f'Ошибка сервера: {str(e)}', 'danger')
             return redirect(url_for('feedback_form'))
+        if session.get('user_id') == None:
+            return redirect(url_for('success'))
+        else:
+            return redirect(url_for('profile'))
+        
+@app.route('/success')
+def success():
+    return render_template('success.html',)
 
-    return render_template('feedback.html', username=session.get('username'))
-
+@app.route('/api/feedbacks/export', methods=['GET'])
+@login_required
+def export_feedbacks_csv():
+    
+    #Получение параметров
+    from_date = request.args.get('from_date', type=str)
+    to_date = request.args.get('to_date', type=str)
+    status = request.args.get('status', type=str)
+    category = request.args.get('category', type=str)
+    author_id = request.args.get('author_id', type=int)
+    
+    # Если пользователь не админ — показываем только его отзывы
+    if session.get('role') != 1:
+        author_id = session['user_id']
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        #Построение WHERE-условий
+        where_clauses = []
+        params = []
+        
+        # Фильтр по дате
+        if from_date:
+            where_clauses.append("DATE(created_at) >= %s")
+            params.append(from_date)
+        
+        if to_date:
+            where_clauses.append("DATE(created_at) <= %s")
+            params.append(to_date)
+        
+        # Другие фильтры
+        if status:
+            where_clauses.append("status = %s")
+            params.append(status)
+        
+        if category:
+            where_clauses.append("category = %s")
+            params.append(category)
+        
+        if author_id:
+            where_clauses.append("author_id = %s")
+            params.append(author_id)
+        
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+        
+        #  Получение данных
+        data_sql = f"""
+            SELECT id, author_id, user_name, category, message, status, created_at, updated_at
+            FROM feedbacks
+            {where_sql}
+            ORDER BY created_at DESC
+        """
+        
+        cursor.execute(data_sql, params)
+        feedbacks = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        #  Генерация CSV
+        output = StringIO()
+        writer = csv.writer(output, delimiter=',', quoting=csv.QUOTE_ALL)
+        
+        # Заголовки (на русском для удобства)
+        writer.writerow([
+            'ID',
+            'ID Автора',
+            'Имя пользователя',
+            'Категория',
+            'Сообщение',
+            'Статус',
+            'Дата создания',
+            'Дата обновления'
+        ])
+        
+        # Данные
+        status_labels = {
+            'new': 'Новая',
+            'in_progress': 'В работе',
+            'completed': 'Завершена'
+        }
+        
+        for feedback in feedbacks:
+            writer.writerow([
+                feedback['id'],
+                feedback['author_id'],
+                feedback['user_name'],
+                feedback['category'] or '',
+                feedback['message'],
+                status_labels.get(feedback['status'], feedback['status']),
+                feedback['created_at'].strftime('%d.%m.%Y %H:%M') if feedback['created_at'] else '',
+                feedback['updated_at'].strftime('%d.%m.%Y %H:%M') if feedback['updated_at'] else ''
+            ])
+        
+        #  Формирование ответа
+        output.seek(0)
+        
+        # Генерируем имя файла с датой
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'feedbacks_export_{timestamp}.csv'
+        
+        return Response(
+            output.getvalue(),
+            mimetype='text/csv',
+            headers={
+                'Content-Disposition': f'attachment; filename={filename}',
+                'Content-Type': 'text/csv; charset=utf-8'
+            }
+        )
+        
+    except Error as e:
+        print(f"Ошибка БД при экспорте: {e}")
+        flash('Ошибка при экспорте данных', 'danger')
+        return redirect(url_for('profile'))
+    except Exception as e:
+        print(f"Неожиданная ошибка при экспорте: {type(e).__name__}: {e}")
+        flash('Ошибка при экспорте данных', 'danger')
+        return redirect(url_for('profile'))
+    
 if __name__ == '__main__':
-    app.run(debug=True)
+    # debug=True не работает с eventlet, используйте только для разработки
+    socketio.run(app, debug=True, port=5000, allow_unsafe_werkzeug=True)
