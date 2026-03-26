@@ -1,49 +1,247 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>F33dback</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="static/script.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль | F33dback</title>
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet"  type="text/css" href="{{url_for('static', filename='style.css')}}">
 </head>
-<body class="font-sans bg-gray-50 text-gray-800">
-    <!-- Навигация -->
-    <header class="data-gradient text-white shadow-lg sticky top-0 z-50">
-        <div class="container mx-auto px-4 py-4">
-            <div class="flex flex-col md:flex-row justify-between items-center">
-                <!-- Логотип -->
-                <div class="flex items-center space-x-3 mb-4 md:mb-0">
-                    <div class="bg-white p-2 rounded-lg">
-                        <i class="fa-regular fa-clipboard text-2xl text-blue-600"></i>
-                    </div>
-                    <div>
-                        <h1 class="text-2xl font-bold">F33dback</h1>
-                        <p class="text-xs text-blue-200">Удобная система обратной связи</p>
-                    </div>
+<body class="bg-gray-50 font-sans">
+
+    <!-- Хедер -->
+    <header class="data-gradient text-white sticky top-0 z-50 shadow-md">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-regular fa-clipboard"></i>
+                    <span class="text-xl font-bold">F33dback</span>
                 </div>
-                
-                <!-- Навигационные ссылки -->
-                <div class="flex flex-wrap justify-center gap-4 md:gap-8">
-                    <a href="/" class="px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">Главная</a>
-                    <a href="/about" class="px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">О нас</a>
-                    <a href="/services" class="px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">Услуги</a>
-                    <a href="/request" class="px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">Контакты</a>
-                </div>
+                <a href="/" class="text-white hover:text-blue-200 transition">
+                    <i class="fas fa-arrow-left mr-1"></i>
+                    Вернуться на главную
+                </a>
+                <a href="{{ url_for('logout') }}" class="text-white hover:text-blue-200 transition">
+                    <i class="fas fa-sign-out-alt"></i> Выйти
+                </a>
             </div>
         </div>
     </header>
 
-    
-    
-    <footer class="bg-gray-900 text-white pt-12 pb-8">
-        <div class="pt-8 border-t border-gray-800 text-center text-gray-500 text-sm">
-            <p>&copy; 2026 F33dback.</p>
+    <!-- Основной контент -->
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+        
+        <!-- Информация о пользователе -->
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+            <div class="flex items-center space-x-4">
+                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
+                    <i class="fas fa-user text-2xl text-blue-600"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-gray-800">
+                        {{ username }}
+                    </h1>
+                    
+                    <p class="text-sm text-gray-500">
+                        {% if session.get('role') == 1 %}
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-800">
+                                <i class="fas fa-shield-alt mr-1"></i>Администратор
+                            </span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            <p class="text-sm text-gray-500">
+                        <i class="fa-solid fa-bars"></i>
+                        Всего заявок: {{ total_count }}
+                    </p>
+            <div class="mt-4 pt-4 border-t border-gray-100">
+                <a href="{{ url_for('feedback_form') }}" 
+                   class="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-plus mr-2"></i>
+                    Новая заявка
+                </a>
+            </div>
+        </div>
+
+        <!-- Секция заявок -->
+        <div class="mb-4 flex justify-between items-center">
+            <h2 class="text-xl font-bold text-gray-800 flex items-center">
+                <i class="fas fa-inbox text-blue-600 mr-2"></i>
+                {% if session.get('role') == 1 %}
+                    Заявки клиентов
+                {% else %}
+                    Мои заявки
+                {% endif %}
+            </h2>
+            {% if requests %}
+                <span class="text-sm text-gray-500">
+                    {{ (current_page - 1) * per_page + 1 }}–{{ [(current_page * per_page), total_count]|min }} из {{ total_count }}
+                </span>
+            {% endif %}
+        </div>
+
+        <!-- Карточки заявок -->
+        {% if requests %}
+            <div class="space-y-4">
+                {% for req in requests %}
+                <div class="request-card bg-white rounded-xl shadow-sm p-5 border-l-4 
+                    {% if req.status == 'new' %}border-yellow-500
+                    {% elif req.status == 'in_progress' %}border-blue-500
+                    {% elif req.status == 'completed' %}border-green-500
+                    {% else %}border-red-500{% endif %}">
+                    
+                    <!-- Заголовок карточки -->
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h3 class="font-semibold text-gray-800">
+                                {{ req.category or 'Без темы' }}
+                            </h3>
+                            {% if req.company %}
+                                <p class="text-sm text-gray-500">
+                                    <i class="fas fa-building mr-1"></i>{{ req.company }}
+                                </p>
+                            {% endif %}
+                        </div>
+                        
+                        <!-- Статус -->
+                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium
+                            {% if req.status == 'new' %}bg-yellow-100 text-yellow-800
+                            {% elif req.status == 'in_progress' %}bg-blue-100 text-blue-800
+                            {% elif req.status == 'completed' %}bg-green-100 text-green-800
+                            {% else %}bg-red-100 text-red-800{% endif %}">
+                            {{ status_labels[req.status]['text'] }}
+                        </span>
+                    </div>
+                    
+                    <!-- Текст сообщения -->
+                    <p class="text-gray-700 text-sm mb-4 line-clamp-3">
+                        {{ req.message }}
+                    </p>
+                    
+                    <!-- Футер карточки -->
+                    <div class="flex justify-between items-center text-sm text-gray-500 pt-3 border-t border-gray-100">
+                        <span>
+                            <i class="fas fa-clock mr-1"></i>
+                            {{ req.created_at.strftime('%d.%m.%Y %H:%M') }}
+                            <i class="fa-solid fa-bars"></i>
+                            {{ req.user_name}}
+                        </span>
+                        
+                        {% if session.get('role') == 1 %}
+                        <form method="POST" action="{{ url_for('update_feedback_status') }}" class="flex items-center gap-2">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="feedback_id" value="{{ req.id }}">
+                            
+                            <select name="status" class="text-xs border border-gray-300 rounded px-2 py-1 bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none" onchange="this.form.submit()">
+                                <option value="new" {% if req.status == 'new' %}selected{% endif %}>Новая</option>
+                                <option value="in_progress" {% if req.status == 'in_progress' %}selected{% endif %}>В работе</option>
+                                <option value="completed" {% if req.status == 'completed' %}selected{% endif %}>Завершена</option>
+                                
+                            </select>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- ПАГИНАЦИЯ -->
+            {% if total_pages > 1 %}
+            <div class="mt-8 flex flex-col items-center space-y-4">
+                
+                <!-- Информация о странице -->
+                <p class="text-sm text-gray-500">
+                    Страница <span class="font-medium text-gray-700">{{ current_page }}</span> из {{ total_pages }}
+                </p>
+                
+                <!-- Кнопки навигации -->
+                <nav class="inline-flex rounded-lg shadow-sm" aria-label="Пагинация">
+                    
+                    <!-- Первая страница -->
+                    <a href="{{ url_for('profile', page=1) }}" 
+                       class="px-3 py-2 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 
+                              hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
+                              {% if current_page == 1 %}opacity-50 cursor-not-allowed{% endif %}"
+                       {% if current_page == 1 %}tabindex="-1" aria-disabled="true"{% endif %}>
+                        <i class="fas fa-angle-double-left"></i>
+                    </a>
+                    
+                    <!-- Назад -->
+                    <a href="{{ url_for('profile', page=current_page - 1) }}" 
+                       class="px-3 py-2 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-700 
+                              hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
+                              {% if not has_prev %}opacity-50 cursor-not-allowed{% endif %}"
+                       {% if not has_prev %}tabindex="-1" aria-disabled="true"{% endif %}>
+                        <i class="fas fa-chevron-left"></i>
+                    </a>
+                    
+                    <!-- Номера страниц -->
+                    {% for p in range(1, total_pages + 1) %}
+                        {% if p == 1 or p == total_pages or (p >= current_page - 2 and p <= current_page + 2) %}
+                            <a href="{{ url_for('profile', page=p) }}" 
+                               class="px-4 py-2 border border-gray-300 bg-white text-sm font-medium 
+                                      {% if p == current_page %}
+                                          bg-gray-600 text-gray border-blue-600 
+                                      {% else %}
+                                          text-gray-700 hover:bg-gray-400 
+                                      {% endif %}
+                                      focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                {{ p }}
+                            </a>
+                        {% elif p == current_page - 3 or p == current_page + 3 %}
+                            <span class="px-4 py-2 border border-gray-300 bg-white text-sm text-gray-400">...</span>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    <!-- Вперёд -->
+                    <a href="{{ url_for('profile', page=current_page + 1) }}" 
+                       class="px-3 py-2 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-700 
+                              hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
+                              {% if not has_next %}opacity-50 cursor-not-allowed{% endif %}"
+                       {% if not has_next %}tabindex="-1" aria-disabled="true"{% endif %}>
+                        <i class="fas fa-chevron-right"></i>
+                    </a>
+                    
+                    <!-- Последняя страница -->
+                    <a href="{{ url_for('profile', page=total_pages) }}" 
+                       class="px-3 py-2 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 
+                              hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
+                              {% if current_page == total_pages %}opacity-50 cursor-not-allowed{% endif %}"
+                       {% if current_page == total_pages %}tabindex="-1" aria-disabled="true"{% endif %}>
+                        <i class="fas fa-angle-double-right"></i>
+                    </a>
+                    
+                </nav>
+                
+                
+                
+            </div>
+            {% endif %}
+            
+        {% else %}
+            <!-- Пустое состояние -->
+            <div class="bg-white rounded-xl shadow-sm p-8 text-center">
+                <i class="fas fa-clipboard-list text-4xl text-gray-300 mb-4"></i>
+                <h3 class="text-lg font-medium text-gray-700 mb-2">Заявок пока нет</h3>
+                <p class="text-gray-500 mb-6">Создайте первую заявку, чтобы начать работу с нами</p>
+                <a href="{{ url_for('feedback_form') }}" 
+                   class="inline-flex items-center bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition">
+                    <i class="fas fa-plus mr-2"></i>
+                    Создать заявку
+                </a>
+            </div>
+        {% endif %}
+
+    </div>
+
+    <!-- Футер -->
+    <footer class="bg-gray-800 text-white py-4 mt-8">
+        <div class="container mx-auto px-4 text-center text-sm text-gray-400">
+            © 2026 F33dback · Личный кабинет
         </div>
     </footer>
 
-    <script src="static/anim.js"></script>
 </body>
 </html>

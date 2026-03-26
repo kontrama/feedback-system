@@ -80,9 +80,6 @@ input:focus {
     transition-duration: 150ms;
 }
 
-.data-gradient {
-    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #8b5cf6 100%);
-}
 .login-card {
     backdrop-filter: blur(10px);
     background-color: rgba(255, 255, 255, 0.95);
@@ -120,4 +117,11 @@ input:focus {
 
 .page-link:hover {
     background-color: #f0f0f0;
+}
+.request-card {
+    transition: all 0.2s ease;
+}
+.request-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
 }
