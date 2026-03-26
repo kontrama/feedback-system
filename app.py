@@ -102,7 +102,7 @@ def register():
             flash('Ошибка безопасности', 'danger')
             return redirect(url_for('register'))
         
-        username = request.form.get('username', '').strip()
+        username = request.form.get('username', '')
         password = request.form.get('password', '')
         password_confirm = request.form.get('password_confirm', '')
         
@@ -123,18 +123,17 @@ def register():
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            cursor.execute("SELECT id FROM users WHERE username = %s", (username))
+            cursor.execute("SELECT id FROM users WHERE username = %s", (username,))
             if cursor.fetchone():
                 flash('Пользователь с таким именем уже существует', 'danger')
                 return redirect(url_for('register'))
             
             password_hash = generate_password_hash(password)
-            cursor.execute(
-                "INSERT INTO users (username, password_hash) VALUES (%s, %s)",
-                (username, password_hash)
-            )
+            sql="INSERT INTO users (username, password_hash) VALUES (%s, %s)"
+            
+            cursor.execute(sql, (username, password_hash))
             conn.commit()
-            user_id = cursor.lastrowid
+            
             cursor.close()
             conn.close()
             
@@ -174,7 +173,7 @@ def login():
             # Поиск пользователя по username
             cursor.execute(
                 "SELECT id, username, password_hash, role FROM users WHERE username = %s",
-                (username)
+                (username,)
             )
             user = cursor.fetchone()
             cursor.close()
@@ -214,34 +213,52 @@ def logout():
 @app.route('/profile', methods=['GET', 'POST'])
 @login_required
 def profile():
-
     user_id = session['user_id']
     role = session['role']
+    
+    # ⚙️ Настройки пагинации
+    page = request.args.get('page', 1, type=int)
+    per_page = 10  # Записей на страницу
     
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
+        # Получение данных пользователя
         cursor.execute(
             "SELECT created_at FROM users WHERE id = %s", 
             (user_id,)
         )
         user_data = cursor.fetchone()
         
-
-        if role==0:
+        # 🔢 Подсчёт общего количества заявок для расчёта страниц
+        if role == 0:
+            cursor.execute("SELECT COUNT(*) as count FROM feedbacks WHERE author_id = %s", (user_id,))
+        elif role == 1:
+            cursor.execute("SELECT COUNT(*) as count FROM feedbacks")
+        
+        total_count = cursor.fetchone()['count']
+        total_pages = (total_count + per_page - 1) // per_page  # Округление вверх
+        
+        # 📄 Получение заявок с ограничением (LIMIT и OFFSET)
+        offset = (page - 1) * per_page
+        
+        if role == 0:
             cursor.execute("""
-                SELECT id, topic, status, message, created_at 
+                SELECT id, user_name, category, message, status, created_at 
                 FROM feedbacks 
-                WHERE user_id = %s 
+                WHERE author_id = %s 
                 ORDER BY created_at DESC 
-            """, (user_id,))
-        elif role==1:
+                LIMIT %s OFFSET %s
+            """, (user_id, per_page, offset))
+        elif role == 1:
             cursor.execute("""
-                SELECT id, topic, status, message, created_at 
+                SELECT id, user_name, category, message, status, created_at 
                 FROM feedbacks 
-                ORDER BY created_at DESC
-            """)
+                ORDER BY created_at DESC 
+                LIMIT %s OFFSET %s
+            """, (per_page, offset))
+            
         user_feedbacks = cursor.fetchall()
         
         cursor.close()
@@ -255,11 +272,19 @@ def profile():
         
         return render_template('profile.html',
                              username=session.get('username'),
-                             feedbacks=user_feedbacks,
-                             status_labels=status_labels)
+                             requests=user_feedbacks,           # список заявок
+    status_labels=status_labels,       # словари статусов
+    
+    # 📊 Пагинация:
+    current_page=page,                 # текущая страница
+    total_pages=total_pages,           # всего страниц
+    total_count=total_count,           # всего записей
+    per_page=per_page,                 # записей на страницу
+    has_prev=page > 1,                 # есть ли предыдущая
+    has_next=page < total_pages,       )
                              
     except Error as e:
-        print('ошибк')
+        print(f'Ошибка загрузки профиля: {e}')
         flash(f'Ошибка загрузки профиля: {str(e)}', 'danger')
         return redirect(url_for('index'))
 
@@ -328,7 +353,6 @@ def index():
                          username=session.get('username'))
 
 @app.route('/feedback', methods=['GET', 'POST'])
-@login_required
 def feedback_form():
     if request.method == 'POST':
         # ОТЛАДКА: выводим все полученные данные
@@ -343,14 +367,14 @@ def feedback_form():
         if request.form.get('csrf_token') != session.get('csrf_token'):
             print("CSRF проверка не пройдена")
             flash('Ошибка безопасности', 'danger')
-            return redirect(url_for('request_form'))
+            return redirect(url_for('feedback_form'))
 
         # Получение данных
         name = request.form.get('name', '').strip()
-        topic = request.form.get('topic', '').strip()
+        category = request.form.get('category', '').strip()
         message = request.form.get('message', '').strip()
         
-        print(f"Данные формы: name={name}, topic={topic}")
+        print(f"Данные формы: name={name}, category={category}")
 
         # Валидация
         if not name or not message:
@@ -363,11 +387,15 @@ def feedback_form():
             
             # ОТЛАДКА: показываем SQL-запрос
             sql = """
-                INSERT INTO requests 
-                (author_id, name, topic, message, status)
+                INSERT INTO feedbacks 
+                (author_id, user_name, category, message, status)
                 VALUES (%s, %s, %s, %s, 'new')
             """
-            params = (session['user_id'], name or None, topic or None, message)
+            if session.get('user_id') == None:
+                uid='0'
+            else:
+                uid=session.get('user_id')
+            params = (uid, name or None, category or None, message)
             
             print(f"SQL: {sql}")
             print(f"Параметры: {params}")
@@ -390,3 +418,6 @@ def feedback_form():
             return redirect(url_for('feedback_form'))
 
     return render_template('feedback.html', username=session.get('username'))
+
+if __name__ == '__main__':
+    app.run(debug=True)
