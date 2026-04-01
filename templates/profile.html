@@ -278,7 +278,7 @@
                          </span>
     
                         {% if session.get('role') == 1 %}
-                        <!-- 🔄 Форма обновления статуса (с JavaScript) -->
+                        <!-- Форма обновления статуса (с JavaScript) -->
                         <form data-feedback-form data-feedback-id="{{ req.id }}" class="flex items-center gap-2">
                             <!-- CSRF токен (если нужен для API) -->
                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -422,7 +422,7 @@
         </div>
     </footer>
 <script>
-// 📊 КОНФИГУРАЦИЯ СТАТУСОВ (глобальная переменная)
+//  КОНФИГУРАЦИЯ СТАТУСОВ (глобальная переменная)
 const statusConfig = {
     'new': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Новая', border: 'border-yellow-500' },
     'in_progress': { bg: 'bg-blue-100', text: 'text-blue-800', label: 'В работе', border: 'border-blue-500' },
@@ -430,7 +430,7 @@ const statusConfig = {
     'cancelled': { bg: 'bg-red-100', text: 'text-red-800', label: 'Отменена', border: 'border-red-500' }
 };
 
-// 🔌 Подключение к WebSocket
+//  Подключение к WebSocket
 const socket = io({
     transports: ['websocket', 'polling'],
     reconnection: true,
@@ -438,7 +438,7 @@ const socket = io({
 });
 
 socket.on('connect', () => {
-    console.log('✅ WebSocket подключён:', socket.id);
+    console.log(' WebSocket подключён:', socket.id);
     socket.emit('join_room', { room: 'feedbacks' });
 });
 
@@ -446,28 +446,25 @@ socket.on('disconnect', () => {
     console.log('❌ WebSocket отключён');
 });
 
-// 📡 Слушаем обновление статуса
+//  Слушаем обновление статуса
 socket.on('status_updated', (data) => {
-    console.log('🔄 Получено обновление:', data);
+    console.log(' Получено обновление:', data);
     
     const feedbackId = data.feedback_id;
     const newStatus = data.new_status;
     
-    // 🔍 Ищем карточку на текущей странице
+    //  Ищем карточку на текущей странице
     const form = document.querySelector(`[data-feedback-form][data-feedback-id="${feedbackId}"]`);
     
     if (form) {
-        // ✅ Карточка найдена - обновляем её
+        //  Карточка найдена - обновляем её
         updateFeedbackCard(form, data);
     } else {
-        // ❌ Карточка не найдена (другая страница или не в списке)
+        //  Карточка не найдена (другая страница или не в списке)
         console.log(`⚠️ Заявка #${feedbackId} не найдена на текущей странице`);
         
         // Показываем уведомление
-        showNotification(
-            `Заявка #${feedbackId} обновлена: ${getStatusLabel(newStatus)}. Обновите страницу для просмотра.`,
-            'info'
-        );
+        
         
         // Опционально: добавляем кнопку для быстрого перехода
         setTimeout(() => {
@@ -483,24 +480,24 @@ socket.on('status_updated', (data) => {
     }
 });
 
-// 🔄 Функция обновления карточки
+//  Функция обновления карточки
 function updateFeedbackCard(form, data) {
     const feedbackId = data.feedback_id;
     const newStatus = data.new_status;
     
     const card = form.closest('.request-card');
     if (!card) {
-        console.log('⚠️ Карточка не найдена');
+        console.log(' Карточка не найдена');
         return;
     }
     
     const config = statusConfig[newStatus];
     if (!config) {
-        console.log('⚠️ Неизвестный статус:', newStatus);
+        console.log(' Неизвестный статус:', newStatus);
         return;
     }
     
-    // 1️⃣ Обновляем бейдж
+    //  Обновляем бейдж
     const badge = card.querySelector('[class*="bg-"][class*="100"]');
     if (badge) {
         badge.classList.remove(
@@ -513,29 +510,24 @@ function updateFeedbackCard(form, data) {
         badge.textContent = config.label;
     }
     
-    // 2️⃣ Обновляем границу
+    //  Обновляем границу
     card.classList.remove('border-yellow-500', 'border-blue-500', 'border-green-500', 'border-red-500');
     card.classList.add(config.border);
     
-    // 3️⃣ Обновляем select
+    //  Обновляем select
     const select = form.querySelector('select[name="status"]');
     if (select) {
         select.value = newStatus;
         select.disabled = (newStatus === 'completed');
     }
+
     
-    // 4️⃣ Уведомление
-    showNotification(
-        `Заявка #${feedbackId}: статус изменён на "${config.label}"`,
-        'info'
-    );
-    
-    // 5️⃣ Визуальный эффект
+    //  Визуальный эффект
     card.classList.add('ring-2', 'ring-blue-400', 'transition-all', 'duration-500');
     setTimeout(() => card.classList.remove('ring-2', 'ring-blue-400'), 1500);
 }
 
-// 📊 Вспомогательная функция для получения названия статуса
+//  Вспомогательная функция для получения названия статуса
 function getStatusLabel(status) {
     const labels = {
         'new': 'Новая',
@@ -546,7 +538,7 @@ function getStatusLabel(status) {
     return labels[status] || status;
 }
 
-// 🔄 Обработчик изменения статуса (отправка на сервер)
+//  Обработчик изменения статуса (отправка на сервер)
 document.querySelectorAll('[data-feedback-form]').forEach(form => {
     const select = form.querySelector('select[name="status"]');
     
@@ -576,10 +568,10 @@ document.querySelectorAll('[data-feedback-form]').forEach(form => {
                 throw new Error(result.message || 'Ошибка обновления');
             }
             
-            showNotification('Статус обновлён ✓', 'success');
+            showNotification('Статус обновлён ', 'success');
             
         } catch (error) {
-            console.error('❌ Ошибка:', error);
+            console.error(' Ошибка:', error);
             this.value = originalValue;
             showNotification(error.message || 'Не удалось обновить статус', 'error');
             
