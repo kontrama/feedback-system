@@ -232,6 +232,15 @@ def profile():
     page = request.args.get('page', 1, type=int)
     per_page = 10  # Записей на страницу
     
+    # Получение параметров фильтрации и сортировки
+    category_filter = request.args.get('category', type=str)
+    status_filter = request.args.get('status', type=str)
+    sort_order = request.args.get('sort', default='desc', type=str)  # 'asc' или 'desc'
+
+    # Валидация sort_order
+    if sort_order not in ['asc', 'desc']:
+        sort_order = 'desc'
+    
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -244,33 +253,65 @@ def profile():
         user_data = cursor.fetchone()
         
         #  Подсчёт общего количества заявок для расчёта страниц
+        
         if role == 0:
-            cursor.execute("SELECT COUNT(*) as count FROM feedbacks WHERE author_id = %s", (user_id,))
+            # Обычный пользователь видит только свои, фильтры по категории/статусу применяются
+            count_query = "SELECT COUNT(*) as count FROM feedbacks WHERE author_id = %s"
+            count_params = [user_id]
+            if category_filter:
+                count_query += " AND category = %s"
+                count_params.append(category_filter)
+            if status_filter:
+                count_query += " AND status = %s"
+                count_params.append(status_filter)
+            cursor.execute(count_query, tuple(count_params))
         elif role == 1:
-            cursor.execute("SELECT COUNT(*) as count FROM feedbacks")
+        # Админ видит все с фильтрами
+            count_query = "SELECT COUNT(*) as count FROM feedbacks WHERE 1=1"
+            count_params = []
+            if category_filter:
+                count_query += " AND category = %s"
+                count_params.append(category_filter)
+            if status_filter:
+                count_query += " AND status = %s"
+                count_params.append(status_filter)
+            cursor.execute(count_query, tuple(count_params))
         
         total_count = cursor.fetchone()['count']
         total_pages = (total_count + per_page - 1) // per_page  # Округление вверх
         
         #  Получение заявок с ограничением (LIMIT и OFFSET)
         offset = (page - 1) * per_page
-        
+        base_query = """
+            SELECT id, user_name, category, message, status, created_at 
+            FROM feedbacks 
+        """
+        query_params = []
+
         if role == 0:
-            cursor.execute("""
-                SELECT id, user_name, category, message, status, created_at 
-                FROM feedbacks 
-                WHERE author_id = %s 
-                ORDER BY created_at DESC 
-                LIMIT %s OFFSET %s
-            """, (user_id, per_page, offset))
+            base_query += " WHERE author_id = %s"
+            query_params.append(user_id)
+            if category_filter:
+                base_query += " AND category = %s"
+                query_params.append(category_filter)
+            if status_filter:
+                base_query += " AND status = %s"
+                query_params.append(status_filter)
         elif role == 1:
-            cursor.execute("""
-                SELECT id, user_name, category, message, status, created_at 
-                FROM feedbacks 
-                ORDER BY created_at DESC 
-                LIMIT %s OFFSET %s
-            """, (per_page, offset))
-            
+            base_query += " WHERE 1=1"  # чтобы удобно добавлять условия
+            if category_filter:
+                base_query += " AND category = %s"
+                query_params.append(category_filter)
+            if status_filter:
+                base_query += " AND status = %s"
+                query_params.append(status_filter)
+
+# Сортировка
+        base_query += f" ORDER BY created_at {sort_order.upper()}"
+        base_query += " LIMIT %s OFFSET %s"
+        query_params.extend([per_page, offset])
+
+        cursor.execute(base_query, tuple(query_params))
         user_feedbacks = cursor.fetchall()
         
         cursor.close()
@@ -292,7 +333,10 @@ def profile():
                             total_count=total_count,           # всего записей
                             per_page=per_page,                 # записей на страницу
                             has_prev=page > 1,                 # есть ли предыдущая
-                            has_next=page < total_pages)
+                            has_next=page < total_pages,       # проверка есть ли след страница 
+                            current_category=category_filter,  # фильтр по категории
+                            current_status=status_filter,      # фильтр по статусу
+                            current_sort=sort_order)           # пордяок
                              
     except Error as e:
         print(f'Ошибка загрузки профиля: {e}')
@@ -626,7 +670,165 @@ def export_feedbacks_csv():
         print(f"Неожиданная ошибка при экспорте: {type(e).__name__}: {e}")
         flash('Ошибка при экспорте данных', 'danger')
         return redirect(url_for('profile'))
-    
+
+@app.route('/api/analytics', methods=['GET'])
+@login_required
+def get_analytics():
+    """Получение аналитики для дашборда"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Определяем фильтры для пользователя
+        if session.get('role') == 1:
+            # Админ видит все
+            where_clause = "WHERE 1=1"
+            params = []
+        else:
+            # Обычный пользователь видит только свои
+            where_clause = "WHERE author_id = %s"
+            params = [session['user_id']]
+        
+        # KPI: Всего отзывов
+        cursor.execute(f"""
+            SELECT COUNT(*) as total 
+            FROM feedbacks 
+            {where_clause}
+        """, params)
+        total_feedbacks = cursor.fetchone()['total']
+        
+        # KPI: Положительных отзывов
+        cursor.execute(f"""
+            SELECT COUNT(*) as positive 
+            FROM feedbacks 
+            {where_clause} AND category = 'Положительный'
+        """, params)
+        positive_feedbacks = cursor.fetchone()['positive']
+        
+        # KPI: Решенных проблем (completed)
+        cursor.execute(f"""
+            SELECT COUNT(*) as resolved 
+            FROM feedbacks 
+            {where_clause} AND status = 'completed'
+        """, params)
+        resolved_problems = cursor.fetchone()['resolved']
+        
+        # KPI: В работе
+        cursor.execute(f"""
+            SELECT COUNT(*) as in_progress 
+            FROM feedbacks 
+            {where_clause} AND status = 'in_progress'
+        """, params)
+        in_progress_count = cursor.fetchone()['in_progress']
+        
+        # График: Отзывы по дням за последнюю неделю
+        cursor.execute(f"""
+            SELECT 
+                DATE(created_at) as date,
+                COUNT(*) as count
+            FROM feedbacks 
+            {where_clause} 
+                AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+            GROUP BY DATE(created_at)
+            ORDER BY date ASC
+        """, params)
+        daily_data = cursor.fetchall()
+        
+        # Преобразуем в удобный формат
+        from datetime import datetime, timedelta
+        chart_data = []
+        chart_labels = []
+        
+        # Генерируем все 7 дней
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=6)
+        
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime('%Y-%m-%d')
+            # Ищем данные для этого дня
+            day_data = next((d for d in daily_data if d['date'].strftime('%Y-%m-%d') == date_str), None)
+            
+            chart_labels.append(current_date.strftime('%d.%m'))  # Формат: 01.04
+            chart_data.append(day_data['count'] if day_data else 0)
+            
+            current_date += timedelta(days=1)
+        
+        # Распределение по категориям
+        cursor.execute(f"""
+            SELECT 
+                category,
+                COUNT(*) as count
+            FROM feedbacks 
+            {where_clause}
+            GROUP BY category
+        """, params)
+        category_data = cursor.fetchall()
+        
+        categories = [row['category'] or 'Без категории' for row in category_data]
+        category_counts = [row['count'] for row in category_data]
+        
+        # Распределение по статусам
+        cursor.execute(f"""
+            SELECT 
+                status,
+                COUNT(*) as count
+            FROM feedbacks 
+            {where_clause}
+            GROUP BY status
+        """, params)
+        status_data = cursor.fetchall()
+        
+        status_labels_map = {
+            'new': 'Новые',
+            'in_progress': 'В работе',
+            'completed': 'Завершенные'
+        }
+        statuses = [status_labels_map.get(row['status'], row['status']) for row in status_data]
+        status_counts = [row['count'] for row in status_data]
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'kpi': {
+                    'total': total_feedbacks,
+                    'positive': positive_feedbacks,
+                    'resolved': resolved_problems,
+                    'in_progress': in_progress_count
+                },
+                'chart': {
+                    'labels': chart_labels,
+                    'data': chart_data
+                },
+                'categories': {
+                    'labels': categories,
+                    'data': category_counts
+                },
+                'statuses': {
+                    'labels': statuses,
+                    'data': status_counts
+                }
+            }
+        }), 200
+        
+    except Error as e:
+        print(f"Ошибка при получении аналитики: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'database_error',
+            'message': 'Ошибка при получении данных'
+        }), 500
+    except Exception as e:
+        print(f"Неожиданная ошибка в аналитике: {type(e).__name__}: {e}")
+        return jsonify({
+            'success': False,
+            'error': 'internal_error',
+            'message': 'Внутренняя ошибка сервера'
+        }), 500
+
 if __name__ == '__main__':
     # debug=True не работает с eventlet, используйте только для разработки
     socketio.run(app, debug=True, port=5000, allow_unsafe_werkzeug=True)
