@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet"  type="text/css" href="{{url_for('static', filename='style.css')}}">
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body class="bg-gray-50 font-sans">
 
@@ -30,9 +31,113 @@
             </div>
         </div>
     </header>
-
+<!-- Дашборд аналитики -->
+<div id="dashboard-container" class="container mx-auto px-4 py-6 max-w-7xl hidden">
+    <div class="bg-white rounded-xl shadow-md p-6 mb-6">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800">
+                <i class="fas fa-chart-line text-blue-600 mr-2"></i>
+                Аналитика
+            </h2>
+            <button id="close-dashboard" class="text-gray-500 hover:text-gray-700 transition">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <!-- KPI Карточки -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <!-- Всего отзывов -->
+            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-blue-100 text-sm mb-1">Всего отзывов</p>
+                        <p class="text-3xl font-bold" id="kpi-total">0</p>
+                    </div>
+                    <div class="bg-blue-400 bg-opacity-30 rounded-full p-3">
+                        <i class="fas fa-comments text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Положительных -->
+            <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-green-100 text-sm mb-1">Положительных</p>
+                        <p class="text-3xl font-bold" id="kpi-positive">0</p>
+                    </div>
+                    <div class="bg-green-400 bg-opacity-30 rounded-full p-3">
+                        <i class="fas fa-smile text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Решенных проблем -->
+            <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-purple-100 text-sm mb-1">Решенных проблем</p>
+                        <p class="text-3xl font-bold" id="kpi-resolved">0</p>
+                    </div>
+                    <div class="bg-purple-400 bg-opacity-30 rounded-full p-3">
+                        <i class="fas fa-check-circle text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- В работе -->
+            <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-orange-100 text-sm mb-1">В работе</p>
+                        <p class="text-3xl font-bold" id="kpi-in-progress">0</p>
+                    </div>
+                    <div class="bg-orange-400 bg-opacity-30 rounded-full p-3">
+                        <i class="fas fa-spinner text-2xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Графики -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- График по дням -->
+            <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-calendar-week text-blue-600 mr-2"></i>
+                    Отзывы по дням (последние 7 дней)
+                </h3>
+                <div class="relative h-64">
+                    <canvas id="chartDaily"></canvas>
+                </div>
+            </div>
+            
+            <!-- Распределение по категориям -->
+            <div class="bg-gray-50 rounded-xl p-6 border border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-chart-pie text-green-600 mr-2"></i>
+                    По категориям
+                </h3>
+                <div class="relative h-64 flex justify-center">
+                    <canvas id="chartCategories"></canvas>
+                </div>
+            </div>
+            
+            <!-- Распределение по статусам (на всю ширину) -->
+            <div class="bg-gray-50 rounded-xl p-6 border border-gray-200 lg:col-span-2">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">
+                    <i class="fas fa-tasks text-purple-600 mr-2"></i>
+                    По статусам
+                </h3>
+                <div class="relative h-64">
+                    <canvas id="chartStatuses"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
     <!-- Основной контент -->
-    <div class="container mx-auto px-4 py-8 max-w-4xl">
+    <div id='maindiv' class="container mx-auto px-4 py-8 max-w-4xl">
         
         <!-- Информация о пользователе -->
         <div class="bg-white rounded-xl shadow-md p-6 mb-8">
@@ -72,11 +177,16 @@
             <i class="fas fa-file-export mr-2"></i>
             Экспорт в CSV
         </button>
+        <button onclick="toggleDashboard()" 
+            class="inline-flex items-center bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition">
+            <i class="fas fa-chart-line mr-2"></i>
+            Дашборд
+        </button>
         {% endif %}
     </div>
 </div>
 
-<!-- 📥 Панель экспорта (скрыта по умолчанию) -->
+<!-- Панель экспорта (скрыта по умолчанию) -->
 {% if session.get('role') == 1 %}
 <div id="export-panel" class="hidden mt-4 bg-gray-50 rounded-lg p-4 border border-gray-200">
     <h3 class="text-lg font-semibold text-gray-800 mb-3">
@@ -158,6 +268,7 @@
                 <i class="fas fa-inbox text-blue-600 mr-2"></i>
                 {% if session.get('role') == 1 %}
                     Заявки клиентов
+                    <a id='toggle-filters' class='text-sm text-blue-600 hover:underline flex items-center'><i  class="fas fa-sliders-h mr-1"></i>Фильтры </a>
                 {% else %}
                     Мои заявки
                 {% endif %}
@@ -339,58 +450,58 @@
                 <nav class="inline-flex rounded-lg shadow-sm" aria-label="Пагинация">
                     
                     <!-- Первая страница -->
-                    <a href="{{ url_for('profile', page=1) }}" 
-                       class="px-3 py-2 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 
-                              hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
-                              {% if current_page == 1 %}opacity-50 cursor-not-allowed{% endif %}"
-                       {% if current_page == 1 %}tabindex="-1" aria-disabled="true"{% endif %}>
-                        <i class="fas fa-angle-double-left"></i>
-                    </a>
-                    
-                    <!-- Назад -->
-                    <a href="{{ url_for('profile', page=current_page - 1) }}" 
-                       class="px-3 py-2 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-700 
-                              hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
-                              {% if not has_prev %}opacity-50 cursor-not-allowed{% endif %}"
-                       {% if not has_prev %}tabindex="-1" aria-disabled="true"{% endif %}>
-                        <i class="fas fa-chevron-left"></i>
-                    </a>
-                    
-                    <!-- Номера страниц -->
-                    {% for p in range(1, total_pages + 1) %}
-                        {% if p == 1 or p == total_pages or (p >= current_page - 2 and p <= current_page + 2) %}
-                            <a href="{{ url_for('profile', page=p) }}" 
-                               class="px-4 py-2 border border-gray-300 bg-white text-sm font-medium 
-                                      {% if p == current_page %}
-                                          bg-gray-600 text-gray border-blue-600 
-                                      {% else %}
-                                          text-gray-700 hover:bg-gray-400 
-                                      {% endif %}
-                                      focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                {{ p }}
-                            </a>
-                        {% elif p == current_page - 3 or p == current_page + 3 %}
-                            <span class="px-4 py-2 border border-gray-300 bg-white text-sm text-gray-400">...</span>
-                        {% endif %}
-                    {% endfor %}
-                    
-                    <!-- Вперёд -->
-                    <a href="{{ url_for('profile', page=current_page + 1) }}" 
-                       class="px-3 py-2 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-700 
-                              hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
-                              {% if not has_next %}opacity-50 cursor-not-allowed{% endif %}"
-                       {% if not has_next %}tabindex="-1" aria-disabled="true"{% endif %}>
-                        <i class="fas fa-chevron-right"></i>
-                    </a>
-                    
-                    <!-- Последняя страница -->
-                    <a href="{{ url_for('profile', page=total_pages) }}" 
-                       class="px-3 py-2 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 
-                              hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
-                              {% if current_page == total_pages %}opacity-50 cursor-not-allowed{% endif %}"
-                       {% if current_page == total_pages %}tabindex="-1" aria-disabled="true"{% endif %}>
-                        <i class="fas fa-angle-double-right"></i>
-                    </a>
+<a href="{{ url_for('profile', page=1, category=current_category, status=current_status, sort=current_sort) }}" 
+   class="px-3 py-2 rounded-l-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 
+          hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
+          {% if current_page == 1 %}opacity-50 cursor-not-allowed{% endif %}"
+   {% if current_page == 1 %}tabindex="-1" aria-disabled="true"{% endif %}>
+    <i class="fas fa-angle-double-left"></i>
+</a>
+
+<!-- Назад -->
+<a href="{{ url_for('profile', page=current_page - 1, category=current_category, status=current_status, sort=current_sort) }}" 
+   class="px-3 py-2 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-700 
+          hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
+          {% if not has_prev %}opacity-50 cursor-not-allowed{% endif %}"
+   {% if not has_prev %}tabindex="-1" aria-disabled="true"{% endif %}>
+    <i class="fas fa-chevron-left"></i>
+</a>
+
+<!-- Номера страниц -->
+{% for p in range(1, total_pages + 1) %}
+    {% if p == 1 or p == total_pages or (p >= current_page - 2 and p <= current_page + 2) %}
+        <a href="{{ url_for('profile', page=p, category=current_category, status=current_status, sort=current_sort) }}" 
+           class="px-4 py-2 border border-gray-300 bg-white text-sm font-medium 
+                  {% if p == current_page %}
+                      bg-gray-600 text-gray border-blue-600 
+                  {% else %}
+                      text-gray-700 hover:bg-gray-400 
+                  {% endif %}
+                  focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            {{ p }}
+        </a>
+    {% elif p == current_page - 3 or p == current_page + 3 %}
+        <span class="px-4 py-2 border border-gray-300 bg-white text-sm text-gray-400">...</span>
+    {% endif %}
+{% endfor %}
+
+<!-- Вперёд -->
+<a href="{{ url_for('profile', page=current_page + 1, category=current_category, status=current_status, sort=current_sort) }}" 
+   class="px-3 py-2 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-700 
+          hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
+          {% if not has_next %}opacity-50 cursor-not-allowed{% endif %}"
+   {% if not has_next %}tabindex="-1" aria-disabled="true"{% endif %}>
+    <i class="fas fa-chevron-right"></i>
+</a>
+
+<!-- Последняя страница -->
+<a href="{{ url_for('profile', page=total_pages, category=current_category, status=current_status, sort=current_sort) }}" 
+   class="px-3 py-2 rounded-r-lg border border-gray-300 bg-white text-sm font-medium text-gray-700 
+          hover:bg-gray-50 focus:z-10 focus:outline-none focus:ring-2 focus:ring-blue-500
+          {% if current_page == total_pages %}opacity-50 cursor-not-allowed{% endif %}"
+   {% if current_page == total_pages %}tabindex="-1" aria-disabled="true"{% endif %}>
+    <i class="fas fa-angle-double-right"></i>
+</a>
                     
                 </nav>
                 
@@ -443,7 +554,7 @@ socket.on('connect', () => {
 });
 
 socket.on('disconnect', () => {
-    console.log('❌ WebSocket отключён');
+    console.log(' WebSocket отключён');
 });
 
 //  Слушаем обновление статуса
@@ -461,7 +572,7 @@ socket.on('status_updated', (data) => {
         updateFeedbackCard(form, data);
     } else {
         //  Карточка не найдена (другая страница или не в списке)
-        console.log(`⚠️ Заявка #${feedbackId} не найдена на текущей странице`);
+        console.log(` Заявка #${feedbackId} не найдена на текущей странице`);
         
         // Показываем уведомление
         
@@ -584,7 +695,7 @@ document.querySelectorAll('[data-feedback-form]').forEach(form => {
     });
 });
 
-// 📢 Функция уведомлений
+// Функция уведомлений
 function showNotification(message, type = 'info') {
     document.querySelectorAll('.toast-notification')?.forEach(el => el.remove());
     
@@ -611,7 +722,7 @@ function showNotification(message, type = 'info') {
 }
 </script>
 <script>
-    // 📥 Панель экспорта
+    // Панель экспорта
 function toggleExportPanel() {
     const panel = document.getElementById('export-panel');
     if (panel) {
@@ -627,6 +738,412 @@ document.addEventListener('DOMContentLoaded', function() {
         toDateInput.value = today;
     }
 });
+</script>
+<script>
+// Логика фильтров для админа с сохранением в localStorage
+const FILTER_STORAGE_KEY = 'feedback_filters';
+
+document.addEventListener('DOMContentLoaded', function() {
+    const applyBtn = document.getElementById('apply-filters');
+    const resetBtn = document.getElementById('reset-filters');
+    const filterPanel = document.getElementById('api-filters');
+    const activeFilters = document.getElementById('active-filters');
+    const toggleBtn = document.getElementById('toggle-filters');
+    
+    // Кнопка переключения фильтров
+    toggleBtn.onclick = () => filterPanel?.classList.toggle('hidden');
+    
+    const sectionHeader = document.querySelector('.mb-4.flex.justify-between');
+    if (sectionHeader) {
+        const titleBlock = sectionHeader.querySelector('h2');
+        if (titleBlock) {
+            titleBlock.after(toggleBtn);
+        }
+    }
+    
+    // Сохранение фильтров в localStorage
+    function saveFilters(filters) {
+        try {
+            localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(filters));
+        } catch (e) {
+            console.warn('Не удалось сохранить фильтры:', e);
+        }
+    }
+    
+    // Загрузка фильтров из localStorage
+    function loadFilters() {
+        try {
+            const stored = localStorage.getItem(FILTER_STORAGE_KEY);
+            return stored ? JSON.parse(stored) : {};
+        } catch (e) {
+            console.warn('Не удалось загрузить фильтры:', e);
+            return {};
+        }
+    }
+    
+    // Очистка фильтров
+    function clearFilters() {
+        try {
+            localStorage.removeItem(FILTER_STORAGE_KEY);
+        } catch (e) {
+            console.warn('Не удалось очистить фильтры:', e);
+        }
+    }
+    
+    // Применение фильтров
+    applyBtn?.addEventListener('click', function() {
+        const category = document.getElementById('filter-category').value;
+        const status = document.getElementById('filter-status').value;
+        const sort = document.getElementById('sort-date').value;
+        
+        // Сохраняем в localStorage
+        saveFilters({ category, status, sort });
+        
+        const params = new URLSearchParams(window.location.search);
+        
+        if (category) params.set('category', category);
+        else params.delete('category');
+        
+        if (status) params.set('status', status);
+        else params.delete('status');
+        
+        params.set('sort', sort);
+        params.set('page', '1'); // Сброс на первую страницу
+        
+        window.location.search = params.toString();
+    });
+    
+    // Сброс фильтров
+    resetBtn?.addEventListener('click', function() {
+        clearFilters(); // 🗑️ Очищаем localStorage
+        
+        const params = new URLSearchParams(window.location.search);
+        params.delete('category');
+        params.delete('status');
+        params.delete('sort');
+        params.set('page', '1');
+        window.location.search = params.toString();
+    });
+    
+    // Отображение активных фильтров
+    function renderActiveFilters() {
+        const params = new URLSearchParams(window.location.search);
+        const category = params.get('category');
+        const status = params.get('status');
+        const sort = params.get('sort');
+        
+        activeFilters.innerHTML = '';
+        activeFilters.classList.add('hidden');
+        
+        const filters = [];
+        
+        const statusLabels = {
+            'new': 'Новая',
+            'in_progress': 'В работе',
+            'completed': 'Завершена'
+        };
+        
+        if (category) {
+            filters.push({ key: 'category', value: category, label: `Категория: ${category}` });
+        }
+        if (status) {
+            filters.push({ key: 'status', value: status, label: `Статус: ${statusLabels[status] || status}` });
+        }
+        if (sort && sort !== 'desc') {
+            const sortLabel = sort === 'asc' ? 'Сначала старые' : 'Сначала новые';
+            filters.push({ key: 'sort', value: sort, label: `Сортировка: ${sortLabel}` });
+        }
+        
+        if (filters.length > 0) {
+            activeFilters.classList.remove('hidden');
+            filters.forEach(f => {
+                const tag = document.createElement('span');
+                tag.className = 'inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800';
+                tag.innerHTML = `${f.label} <button data-remove-filter="${f.key}" class="ml-1 hover:text-blue-600">&times;</button>`;
+                activeFilters.appendChild(tag);
+            });
+        }
+    }
+    
+    // Удаление отдельного фильтра
+    activeFilters?.addEventListener('click', function(e) {
+        if (e.target.dataset.removeFilter) {
+            clearFilters(); // При удалении тоже очищаем
+            const params = new URLSearchParams(window.location.search);
+            params.delete(e.target.dataset.removeFilter);
+            params.set('page', '1');
+            window.location.search = params.toString();
+        }
+    });
+    
+    // 🔄 Восстановление фильтров при загрузке страницы
+    function restoreFilters() {
+        const params = new URLSearchParams(window.location.search);
+        const storedFilters = loadFilters();
+        
+        const categorySelect = document.getElementById('filter-category');
+        const statusSelect = document.getElementById('filter-status');
+        const sortSelect = document.getElementById('sort-date');
+        
+        // Приоритет: URL параметры > localStorage > значения по умолчанию
+        const category = params.get('category') || storedFilters.category || '';
+        const status = params.get('status') || storedFilters.status || '';
+        const sort = params.get('sort') || storedFilters.sort || 'desc';
+        
+        // Синхронизируем localStorage с URL (если в URL есть фильтры)
+        if (params.get('category') || params.get('status') || params.get('sort')) {
+            saveFilters({ category, status, sort });
+        }
+        
+        // Устанавливаем значения в селектах
+        if (categorySelect && category) categorySelect.value = category;
+        if (statusSelect && status) statusSelect.value = status;
+        if (sortSelect && sort) sortSelect.value = sort;
+        
+        renderActiveFilters();
+    }
+    
+    restoreFilters();
+});
+</script>
+<script>
+// Переменные для графиков
+let chartDailyInstance = null;
+let chartCategoriesInstance = null;
+let chartStatusesInstance = null;
+
+// Открытие/закрытие дашборда
+function toggleDashboard() {
+    const dashboard = document.getElementById('dashboard-container');
+    const md = document.getElementById('maindiv');
+    if (dashboard.classList.contains('hidden')) {
+        loadDashboard();
+        md.classList.add('hidden');
+    } else {
+        dashboard.classList.add('hidden');
+        md.classList.remove('hidden');
+    }
+}
+
+// Закрытие по кнопке
+document.getElementById('close-dashboard')?.addEventListener('click', function() {
+    const md = document.getElementById('maindiv');
+    document.getElementById('dashboard-container').classList.add('hidden');
+    md.classList.remove('hidden');
+});
+
+// Загрузка данных дашборда
+async function loadDashboard() {
+    const dashboard = document.getElementById('dashboard-container');
+    dashboard.classList.remove('hidden');
+    
+    // Показываем индикатор загрузки
+    const kpiElements = ['kpi-total', 'kpi-positive', 'kpi-resolved', 'kpi-in-progress'];
+    kpiElements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    });
+    
+    try {
+        const response = await fetch('/api/analytics');
+        const result = await response.json();
+        
+        if (!result.success) {
+            throw new Error(result.message || 'Ошибка загрузки данных');
+        }
+        
+        const data = result.data;
+        
+        // Обновляем KPI
+        animateValue('kpi-total', 0, data.kpi.total, 1000);
+        animateValue('kpi-positive', 0, data.kpi.positive, 1000);
+        animateValue('kpi-resolved', 0, data.kpi.resolved, 1000);
+        animateValue('kpi-in-progress', 0, data.kpi.in_progress, 1000);
+        
+        // Строим графики
+        buildDailyChart(data.chart);
+        buildCategoriesChart(data.categories);
+        buildStatusesChart(data.statuses);
+        
+    } catch (error) {
+        console.error('Ошибка загрузки дашборда:', error);
+        showNotification('Не удалось загрузить аналитику: ' + error.message, 'error');
+    }
+}
+
+// Анимация чисел
+function animateValue(elementId, start, end, duration) {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    const range = end - start;
+    const minTimer = 50;
+    let stepTime = Math.abs(Math.floor(duration / range));
+    stepTime = Math.max(stepTime, minTimer);
+    
+    let startTime = new Date().getTime();
+    let endTime = startTime + duration;
+    let timer;
+    
+    function run() {
+        let now = new Date().getTime();
+        let remaining = Math.max((endTime - now) / duration, 0);
+        let value = Math.round(end - (remaining * range));
+        element.textContent = value;
+        if (value == end) {
+            clearInterval(timer);
+        }
+    }
+    
+    timer = setInterval(run, stepTime);
+    run();
+}
+
+// График по дням (линейный)
+function buildDailyChart(chartData) {
+    const ctx = document.getElementById('chartDaily');
+    if (!ctx) return;
+    
+    // Уничтожаем старый график
+    if (chartDailyInstance) {
+        chartDailyInstance.destroy();
+    }
+    
+    chartDailyInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: chartData.labels,
+            datasets: [{
+                label: 'Количество отзывов',
+                data: chartData.data,
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: 'rgb(59, 130, 246)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+}
+
+// График по категориям (пончиковый)
+function buildCategoriesChart(categoryData) {
+    const ctx = document.getElementById('chartCategories');
+    if (!ctx) return;
+    
+    if (chartCategoriesInstance) {
+        chartCategoriesInstance.destroy();
+    }
+    
+    const colors = [
+        'rgb(34, 197, 94)',   // зеленый
+        'rgb(239, 68, 68)',   // красный
+        'rgb(59, 130, 246)',  // синий
+        'rgb(168, 85, 247)',  // фиолетовый
+        'rgb(234, 179, 8)'    // желтый
+    ];
+    
+    chartCategoriesInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: categoryData.labels,
+            datasets: [{
+                data: categoryData.data,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 15,
+                        usePointStyle: true
+                    }
+                }
+            }
+        }
+    });
+}
+
+// График по статусам (столбчатый)
+function buildStatusesChart(statusData) {
+    const ctx = document.getElementById('chartStatuses');
+    if (!ctx) return;
+    
+    if (chartStatusesInstance) {
+        chartStatusesInstance.destroy();
+    }
+    
+    const colors = [
+        'rgb(234, 179, 8)',   // желтый - новые
+        'rgb(59, 130, 246)',  // синий - в работе
+        'rgb(34, 197, 94)'    // зеленый - завершенные
+    ];
+    
+    chartStatusesInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: statusData.labels,
+            datasets: [{
+                label: 'Количество',
+                data: statusData.data,
+                backgroundColor: colors,
+                borderWidth: 0,
+                borderRadius: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    }
+                }
+            }
+        }
+    });
+}
 </script>
 </body>
 </html>
