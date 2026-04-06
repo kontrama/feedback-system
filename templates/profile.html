@@ -161,14 +161,14 @@
             </div>
             <p class="text-sm text-gray-500">
                         <i class="fa-solid fa-bars"></i>
-                        Всего заявок: {{ total_count }}
+                        Всего отзывов: {{ total_count }}
                     </p>
             <div class="mt-4 pt-4 border-t border-gray-100">
     <div class="flex flex-wrap gap-3">
         <a href="{{ url_for('feedback_form') }}" 
            class="inline-flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
             <i class="fas fa-plus mr-2"></i>
-            Новая заявка
+            Новый отзыв
         </a>
         
         {% if session.get('role') == 1 %}
@@ -267,10 +267,10 @@
             <h2 class="text-xl font-bold text-gray-800 flex items-center">
                 <i class="fas fa-inbox text-blue-600 mr-2"></i>
                 {% if session.get('role') == 1 %}
-                    Заявки клиентов
+                    Отзывы пользователей
                     <a id='toggle-filters' class='text-sm text-blue-600 hover:underline flex items-center'><i  class="fas fa-sliders-h mr-1"></i>Фильтры </a>
                 {% else %}
-                    Мои заявки
+                    Мои отзывы
                 {% endif %}
             </h2>
             
@@ -514,12 +514,12 @@
             <!-- Пустое состояние -->
             <div class="bg-white rounded-xl shadow-sm p-8 text-center">
                 <i class="fas fa-clipboard-list text-4xl text-gray-300 mb-4"></i>
-                <h3 class="text-lg font-medium text-gray-700 mb-2">Заявок пока нет</h3>
-                <p class="text-gray-500 mb-6">Создайте первую заявку, чтобы начать работу с нами</p>
+                <h3 class="text-lg font-medium text-gray-700 mb-2">Отзывов пока нет</h3>
+                <p class="text-gray-500 mb-6">Создайте первый отзыв</p>
                 <a href="{{ url_for('feedback_form') }}" 
                    class="inline-flex items-center bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition">
                     <i class="fas fa-plus mr-2"></i>
-                    Создать заявку
+                    Создать отзыв
                 </a>
             </div>
         {% endif %}
@@ -572,7 +572,7 @@ socket.on('status_updated', (data) => {
         updateFeedbackCard(form, data);
     } else {
         //  Карточка не найдена (другая страница или не в списке)
-        console.log(` Заявка #${feedbackId} не найдена на текущей странице`);
+        console.log(` Отзыв #${feedbackId} не найден на текущей странице`);
         
         // Показываем уведомление
         
