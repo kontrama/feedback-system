@@ -11,16 +11,16 @@ from functools import wraps
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24)  # Для защиты сессий
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)  # Время жизни сессии
+app.config['SECRET_KEY'] = os.urandom(24)  
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=1)  
 socketio = SocketIO(
     app, 
-    cors_allowed_origins="*",  # В продакшене укажите ваш домен
-    async_mode='eventlet',  # или 'gevent'
-    logger=True,  # Включить логирование для отладки
+    cors_allowed_origins="*",  
+    async_mode='eventlet',
+    logger=True,  
     engineio_logger=True
 )
-app.config['SESSION_COOKIE_HTTPONLY'] = False  # Разрешить доступ к кукам из JS
+app.config['SESSION_COOKIE_HTTPONLY'] = False  
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 def login_required(f):
@@ -165,7 +165,7 @@ def login():
         return redirect(url_for('index'))
     
     if request.method == 'POST':
-        # CSRF проверка
+        
         if request.form.get('csrf_token') != session.get('csrf_token'):
             flash('Ошибка безопасности', 'danger')
             return redirect(url_for('login'))
@@ -182,7 +182,7 @@ def login():
             conn = get_db_connection()
             cursor = conn.cursor(dictionary=True)
             
-            # Поиск пользователя по username
+            
             cursor.execute(
                 "SELECT id, username, password_hash, role FROM users WHERE username = %s",
                 (username,)
@@ -192,7 +192,7 @@ def login():
             conn.close()
             
             if user and check_password_hash(user['password_hash'], password):
-                # Успешный вход
+                
                 session.permanent = remember
                 session['user_id'] = user['id']
                 session['username'] = user['username']
@@ -217,7 +217,7 @@ def login():
 
 @app.route('/logout')
 def logout():
-    """Выход из системы"""
+    
     session.clear()
     flash('Вы вышли из системы', 'info')
     return redirect('/')
@@ -228,16 +228,16 @@ def profile():
     user_id = session['user_id']
     role = session['role']
     
-    #  Настройки пагинации
-    page = request.args.get('page', 1, type=int)
-    per_page = 10  # Записей на страницу
     
-    # Получение параметров фильтрации и сортировки
+    page = request.args.get('page', 1, type=int)
+    per_page = 5  # Записей на страницу
+    
+    
     category_filter = request.args.get('category', type=str)
     status_filter = request.args.get('status', type=str)
     sort_order = request.args.get('sort', default='desc', type=str)  # 'asc' или 'desc'
 
-    # Валидация sort_order
+    
     if sort_order not in ['asc', 'desc']:
         sort_order = 'desc'
     
@@ -245,17 +245,17 @@ def profile():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        # Получение данных пользователя
+        
         cursor.execute(
             "SELECT created_at FROM users WHERE id = %s", 
             (user_id,)
         )
         user_data = cursor.fetchone()
         
-        #  Подсчёт общего количества заявок для расчёта страниц
+        
         
         if role == 0:
-            # Обычный пользователь видит только свои, фильтры по категории/статусу применяются
+            
             count_query = "SELECT COUNT(*) as count FROM feedbacks WHERE author_id = %s"
             count_params = [user_id]
             if category_filter:
@@ -266,7 +266,7 @@ def profile():
                 count_params.append(status_filter)
             cursor.execute(count_query, tuple(count_params))
         elif role == 1:
-        # Админ видит все с фильтрами
+        
             count_query = "SELECT COUNT(*) as count FROM feedbacks WHERE 1=1"
             count_params = []
             if category_filter:
@@ -278,9 +278,9 @@ def profile():
             cursor.execute(count_query, tuple(count_params))
         
         total_count = cursor.fetchone()['count']
-        total_pages = (total_count + per_page - 1) // per_page  # Округление вверх
+        total_pages = (total_count + per_page - 1) // per_page  
         
-        #  Получение заявок с ограничением (LIMIT и OFFSET)
+        
         offset = (page - 1) * per_page
         base_query = """
             SELECT id, user_name, category, message, status, created_at 
@@ -306,7 +306,7 @@ def profile():
                 base_query += " AND status = %s"
                 query_params.append(status_filter)
 
-# Сортировка
+
         base_query += f" ORDER BY created_at {sort_order.upper()}"
         base_query += " LIMIT %s OFFSET %s"
         query_params.extend([per_page, offset])
@@ -344,10 +344,9 @@ def profile():
         return redirect(url_for('index'))
 
 @app.route('/api/feedbacks/<int:feedback_id>', methods=['PATCH'], endpoint='update_feedback_status_api')
-@login_required  # проверка сессии (если используете session-based auth)
+@login_required 
 def update_feedback_status_api(feedback_id):
     
-    #  Проверка прав администратора
     if session.get('role') != 1:
         return jsonify({
             'success': False,
@@ -355,7 +354,6 @@ def update_feedback_status_api(feedback_id):
             'message': 'Доступ запрещён. Требуются права администратора.'
         }), 403
     
-    #  Получение данных из JSON-тела запроса
     data = request.get_json()
     
     if not data:
@@ -367,7 +365,6 @@ def update_feedback_status_api(feedback_id):
     
     new_status = data.get('status')
     
-    #  Валидация статуса
     valid_statuses = ['new', 'in_progress', 'completed']
     if not new_status or new_status not in valid_statuses:
         return jsonify({
@@ -381,7 +378,6 @@ def update_feedback_status_api(feedback_id):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Сначала проверяем, существует ли заявка
         cursor.execute("SELECT id, status FROM feedbacks WHERE id = %s", (feedback_id,))
         existing_feedback = cursor.fetchone()
         
@@ -394,7 +390,6 @@ def update_feedback_status_api(feedback_id):
                 'message': f'Заявка с ID {feedback_id} не найдена'
             }), 404
         
-        # Обновляем статус
         cursor.execute("""
             UPDATE feedbacks 
             SET status = %s, updated_at = CURRENT_TIMESTAMP 
@@ -405,7 +400,7 @@ def update_feedback_status_api(feedback_id):
         affected = cursor.rowcount
         cursor.close()
         conn.close()
-         # Отправить всем подключённым клиентам
+
         if affected > 0:
         # ОТПРАВКА В КОМНАТУ
             socketio.emit('status_updated', {
@@ -428,7 +423,6 @@ def update_feedback_status_api(feedback_id):
             'success': False,
             'error': 'database_error',
             'message': 'Ошибка при работе с базой данных'
-            # Не возвращайте детали ошибки в продакшене!
         }), 500
         
     except Exception as e:
@@ -439,24 +433,23 @@ def update_feedback_status_api(feedback_id):
             'message': 'Внутренняя ошибка сервера'
         }), 500
 
-#  Отключение клиента
+
 @socketio.on('disconnect')
 def handle_disconnect():
     print(f'Клиент отключился: {request.sid}')
 
-#  Присоединение к комнате (опционально, для фильтрации)
+
 @socketio.on('join_room')
 def handle_join_room(data):
     room = data.get('room')
     if room:
         join_room(room)
-        print(f'✅ Клиент {request.sid} присоединился к комнате {room}')
-        # Отправляем подтверждение клиенту
+        print(f'Клиент {request.sid} присоединился к комнате {room}')
         emit('room_joined', {'room': room}, to=request.sid)
 
 @socketio.on('connect')
 def handle_connect():
-    # Проверка сессии
+
     if 'user_id' not in session:
         print('Отклонено: нет сессии')
         disconnect()
@@ -478,7 +471,7 @@ def feedback_form():
 @app.route('/api/feedbacks', methods=['POST'])
 def feedback_send():
     if request.method == 'POST':
-        # ОТЛАДКА: выводим все полученные данные
+       
         print("POST-данные:", request.form.to_dict())
         print("CSRF токены:", {
             'form': request.form.get('csrf_token'),
@@ -486,20 +479,20 @@ def feedback_send():
         })
         print("Пользователь в сессии:", session.get('user_id'))
         
-        # Проверка CSRF
+       
         if request.form.get('csrf_token') != session.get('csrf_token'):
             print("CSRF проверка не пройдена")
             flash('Ошибка безопасности', 'danger')
             return redirect(url_for('feedback_form'))
 
-        # Получение данных
+        
         name = request.form.get('name', '').strip()
         category = request.form.get('category', '').strip()
         message = request.form.get('message', '').strip()
         
         print(f"Данные формы: name={name}, category={category}")
 
-        # Валидация
+        
         if not name or not message:
             flash('Заполните все обязательные поля', 'warning')
             return redirect(url_for('feedback_form'))
@@ -508,7 +501,7 @@ def feedback_send():
             conn = get_db_connection()
             cursor = conn.cursor()
             
-            # ОТЛАДКА: показываем SQL-запрос
+            
             sql = """
                 INSERT INTO feedbacks 
                 (author_id, user_name, category, message, status)
@@ -552,14 +545,12 @@ def success():
 @login_required
 def export_feedbacks_csv():
     
-    #Получение параметров
     from_date = request.args.get('from_date', type=str)
     to_date = request.args.get('to_date', type=str)
     status = request.args.get('status', type=str)
     category = request.args.get('category', type=str)
     author_id = request.args.get('author_id', type=int)
     
-    # Если пользователь не админ — показываем только его отзывы
     if session.get('role') != 1:
         author_id = session['user_id']
     
@@ -567,11 +558,9 @@ def export_feedbacks_csv():
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        #Построение WHERE-условий
         where_clauses = []
         params = []
         
-        # Фильтр по дате
         if from_date:
             where_clauses.append("DATE(created_at) >= %s")
             params.append(from_date)
@@ -580,7 +569,6 @@ def export_feedbacks_csv():
             where_clauses.append("DATE(created_at) <= %s")
             params.append(to_date)
         
-        # Другие фильтры
         if status:
             where_clauses.append("status = %s")
             params.append(status)
@@ -597,7 +585,6 @@ def export_feedbacks_csv():
         if where_clauses:
             where_sql = "WHERE " + " AND ".join(where_clauses)
         
-        #  Получение данных
         data_sql = f"""
             SELECT id, author_id, user_name, category, message, status, created_at, updated_at
             FROM feedbacks
@@ -615,7 +602,7 @@ def export_feedbacks_csv():
         output = StringIO()
         writer = csv.writer(output, delimiter=',', quoting=csv.QUOTE_ALL)
         
-        # Заголовки (на русском для удобства)
+        # Заголовки
         writer.writerow([
             'ID',
             'ID Автора',
@@ -646,10 +633,8 @@ def export_feedbacks_csv():
                 feedback['updated_at'].strftime('%d.%m.%Y %H:%M') if feedback['updated_at'] else ''
             ])
         
-        #  Формирование ответа
         output.seek(0)
         
-        # Генерируем имя файла с датой
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f'feedbacks_export_{timestamp}.csv'
         
@@ -681,15 +666,15 @@ def get_analytics():
         
         # Определяем фильтры для пользователя
         if session.get('role') == 1:
-            # Админ видит все
+
             where_clause = "WHERE 1=1"
             params = []
         else:
-            # Обычный пользователь видит только свои
+
             where_clause = "WHERE author_id = %s"
             params = [session['user_id']]
         
-        # KPI: Всего отзывов
+
         cursor.execute(f"""
             SELECT COUNT(*) as total 
             FROM feedbacks 
@@ -697,7 +682,7 @@ def get_analytics():
         """, params)
         total_feedbacks = cursor.fetchone()['total']
         
-        # KPI: Положительных отзывов
+
         cursor.execute(f"""
             SELECT COUNT(*) as positive 
             FROM feedbacks 
@@ -705,7 +690,7 @@ def get_analytics():
         """, params)
         positive_feedbacks = cursor.fetchone()['positive']
         
-        # KPI: Решенных проблем (completed)
+
         cursor.execute(f"""
             SELECT COUNT(*) as resolved 
             FROM feedbacks 
@@ -713,7 +698,7 @@ def get_analytics():
         """, params)
         resolved_problems = cursor.fetchone()['resolved']
         
-        # KPI: В работе
+
         cursor.execute(f"""
             SELECT COUNT(*) as in_progress 
             FROM feedbacks 
@@ -721,7 +706,7 @@ def get_analytics():
         """, params)
         in_progress_count = cursor.fetchone()['in_progress']
         
-        # График: Отзывы по дням за последнюю неделю
+
         cursor.execute(f"""
             SELECT 
                 DATE(created_at) as date,
@@ -734,12 +719,12 @@ def get_analytics():
         """, params)
         daily_data = cursor.fetchall()
         
-        # Преобразуем в удобный формат
+
         from datetime import datetime, timedelta
         chart_data = []
         chart_labels = []
         
-        # Генерируем все 7 дней
+
         end_date = datetime.now().date()
         start_date = end_date - timedelta(days=6)
         
@@ -754,7 +739,7 @@ def get_analytics():
             
             current_date += timedelta(days=1)
         
-        # Распределение по категориям
+
         cursor.execute(f"""
             SELECT 
                 category,
@@ -768,7 +753,7 @@ def get_analytics():
         categories = [row['category'] or 'Без категории' for row in category_data]
         category_counts = [row['count'] for row in category_data]
         
-        # Распределение по статусам
+
         cursor.execute(f"""
             SELECT 
                 status,
